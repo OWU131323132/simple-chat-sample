@@ -4,65 +4,191 @@
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>センサからの信号受信</title>
+    <title>パワー・ストップ レース | PC画面</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.8.0/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.3/socket.io.js"></script>
+    <style>
+      #score-list {
+        list-style-type: none;
+        padding-left: 0;
+      }
+      .finished {
+        color: green;
+        font-weight: bold;
+      }
+    </style>
   </head>
+
   <body>
-    <h1>スマホからのセンサ情報を受信</h1>
+    <h1>パワー・ストップ レース | PC画面</h1>
     <div>
       <div>あなたのID: <span id="myid"></span></div>
       <button id="connect">接続開始</button>
-      <div>受信した情報はコンソールログで確認してください</div>
+      <div>スマホでsmart.htmlを開き、接続後に縦に振ってスタートしてください。</div>
     </div>
+    
+    <div id="ranking" style="margin-top: 20px;">
+      <h2>リアルタイムランキング</h2>
+      <ul id="score-list">
+        <li>スマホを縦に振ってスタート！</li>
+      </ul>
+    </div>
+    
     <script>
       let socket = io.connect();
-      
+
       let myid = sessionStorage.getItem('clientId');
       if (!myid) {
         myid = Math.random().toString(36).substring(2, 15);
         sessionStorage.setItem('clientId', myid);
       }
       
-      document.querySelector("#myid").innerHTML = myid;
+      document.querySelector("#myid").innerHTML = myid.substring(0, 6);
       console.log("あなたのID: ", myid);
-      
-      let g = 0;
-      let b = 0;
 
       let btn = document.querySelector("#connect");
-
+      
+      // 接続ボタンを押したらゲームルームに参加
       btn.addEventListener("click", function () {
         socket.emit("join", "game");
+        
+        // 接続IDをサーバーに通知（ランキング表示のため）
+        socket.emit('user connected', myid); 
         btn.remove();
       });
 
-      socket.on("sensor", function (data) {
-        g = parseFloat(data.g);
-        b = parseFloat(data.b);
-        console.log(b);
+      // --- ゲームロジックのための変数 ---
+      let players = {}; // 全プレイヤーの状態を保持
+      const GAME_AREA_WIDTH = 500;
+      const GAME_AREA_HEIGHT = 400; // キャンバスの高さを設定
+      const START_X = 50;
+      const GOAL_X = 450;
+      
+      // サーバーからのゲーム状態更新を受信
+      socket.on("game_update", function (data) {
+          players = data;
+          updateRankingDisplay();
       });
 
-      let targetX;
-      let targetY;
-      function setup() {
-        createCanvas(500, 500);
-        background(200);
-        targetX = random(width);
-        targetY = random(height);
+      // ゴール通知を受信
+      socket.on("game_finished", function (data) {
+          if (data.id === myid) {
+              alert(`🎉 あなたがゴール！ タイム: ${data.time}秒`);
+          } else {
+              console.log(`🎉 ユーザー ${data.id.substring(0, 6)} がゴール！ タイム: ${data.time}秒`);
+          }
+      });
+      
+      // 接続処理 (ID表示などのため)
+      socket.on('welcome', (id) => {
+        // 処理不要
+      });
+      
+      socket.on('player_list', (initialPlayers) => {
+        players = initialPlayers;
+        updateRankingDisplay();
+      });
+
+
+      // ランキング表示を更新する関数
+      function updateRankingDisplay() {
+          const scoreList = document.querySelector("#score-list");
+          scoreList.innerHTML = ''; // リストをクリア
+          
+          // プレイヤーをベストタイムでソート
+          const sortedPlayers = Object.values(players)
+              .sort((a, b) => {
+                  // ゴールしたプレイヤーを優先 (Infinityを考慮)
+                  if (a.isFinished && !b.isFinished) return -1;
+                  if (!a.isFinished && b.isFinished) return 1;
+                  // ゴール済みならタイムでソート
+                  if (a.isFinished && b.isFinished) return a.bestTime - b.bestTime;
+                  // 未ゴールならIDでソート（適当）
+                  return a.id.localeCompare(b.id);
+              });
+
+          // ランキング表示
+          sortedPlayers.forEach((p, index) => {
+              const status = (p.id === myid) ? ' (あなた)' : '';
+              const item = document.createElement('li');
+              
+              if (p.isFinished) {
+                  const timeStr = p.bestTime.toFixed(2);
+                  item.classList.add('finished');
+                  item.textContent = `#${index + 1}: ${p.id.substring(0, 6)} ${status} - ${timeStr}秒`;
+              } else {
+                  // レース中のプレイヤー
+                  const v_text = p.startTime ? ` (速度: ${p.v.toFixed(1)})` : '';
+                  item.textContent = `${p.id.substring(0, 6)} ${status} - レース前${v_text}`;
+              }
+              scoreList.appendChild(item);
+          });
       }
 
-      let x = 250;
-      let y = 250;
+      function setup() {
+          createCanvas(GAME_AREA_WIDTH, GAME_AREA_HEIGHT);
+          background(200);
+          rectMode(CENTER);
+          noStroke();
+      }
 
       function draw() {
-        background(200);
-        circle(targetX,targetY,30,30);
-        x += g*0.02;
-        y += b*0.02;
-        if ( dist(x,y, targetX, targetY) < 10 ) background(0);  // (dist(x,y, targetX, targetY) < 10)
-        circle(x, y, 50);
+          background(220); // 背景を薄いグレーに
+          
+          // --- コース描画 ---
+          // ゴールラインを描画
+          stroke(255, 0, 0); // 赤色
+          strokeWeight(4);
+          line(GOAL_X, 0, GOAL_X, GAME_AREA_HEIGHT);
+          
+          // スタートラインを描画
+          stroke(0, 200, 0); // 緑色
+          strokeWeight(4);
+          line(START_X, 0, START_X, GAME_AREA_HEIGHT);
+          
+          noStroke();
+          
+          // --- 全プレイヤーのバーを描画 ---
+          const playerIds = Object.keys(players);
+          playerIds.forEach((id, index) => {
+              const player = players[id];
+              const playerX = player.x;
+              // 描画Y座標を均等にずらす
+              const playerY = GAME_AREA_HEIGHT * (index + 1) / (playerIds.length + 1); 
+              
+              
+              // プレイヤーごとの色設定（IDから生成）
+              const color = getColorFromId(id);
+              if (player.isFinished) {
+                 fill(color[0], color[1], color[2], 150); // ゴールしたら薄い色
+              } else {
+                 fill(color[0], color[1], color[2]);
+              }
+              
+              // バー（自機）の描画
+              rect(playerX, playerY, 40, 30);
+              
+              // プレイヤーIDを表示
+              fill(0);
+              textSize(12);
+              textAlign(CENTER, CENTER);
+              text(player.id.substring(0, 6), playerX, playerY - 15);
+          });
       }
+      
+      // IDから色を生成する関数 (index.htmlから拝借)
+      function getColorFromId(id) {
+        let hash = 0;
+        for (let i = 0; i < id.length; i++) {
+          hash = id.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const h = Math.abs(hash % 360);
+        // HSLをRGBに変換する簡易的な処理（P5.jsはRGBのため）
+        // HSLから色相(H)のみを利用し、S=60%, L=65%を仮定
+        return color(h, 60, 65, 360, 100, 100).levels; 
+      }
+      // P5.jsの色モードをHSLに設定
+      colorMode(HSL, 360, 100, 100);
 
     </script>
   </body>
