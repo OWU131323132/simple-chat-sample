@@ -1,140 +1,140 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="-1" />
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>スマホ操作コントローラー</title>
+	<head>
+		<meta http-equiv="Pragma" content="no-cache" />
+		<meta http-equiv="Expires" content="-1" />
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>スマホ操作コントローラー</title>
 
-    <script type="module">
-      import { io } from "https://cdn.socket.io/4.5.1/socket.io.esm.min.js";
+		<script type="module">
+			import { io } from "https://cdn.socket.io/4.5.1/socket.io.esm.min.js";
 
-      document.addEventListener("DOMContentLoaded", () => {
-        let devid = sessionStorage.getItem('clientId');
-        if (!devid) {
-          devid = Math.random().toString(36).substring(2, 15);
-          sessionStorage.setItem('clientId', devid);
-        }
-        
-        let decPlaces = 2;
-        let interval = 50; // 20 fps
-        let alpha = 0,
-          beta = 0,
-          gamma = 0;
-        let z = 0; // Z軸も取得・送信はするが、ゲーム側で未使用
+			document.addEventListener("DOMContentLoaded", () => {
+				let devid = sessionStorage.getItem('clientId');
+				if (!devid) {
+					devid = Math.random().toString(36).substring(2, 15);
+					sessionStorage.setItem('clientId', devid);
+				}
+				
+				let decPlaces = 2;
+				let interval = 50;
+				let alpha = 0,
+					beta = 0,
+					gamma = 0;
+				let z = 0;
 
-        const socket = io();
-        
-        document.querySelector("#contents").textContent =
-          "接続されました。あなたのIDは：" + devid.substring(0, 6);
-        document.querySelector("#content").style.backgroundColor =
-          getColorFromId(devid);
+				const socket = io();
+				
+				document.querySelector("#contents").textContent =
+					"接続されました。あなたのIDは：" + devid.substring(0, 6);
+				document.querySelector("#content").style.backgroundColor =
+					getColorFromId(devid);
 
-        if (!("WebSocket" in window)) {
-          alert("ブラウザがWebSocketsをサポートしていません");
-        }
+				if (!("WebSocket" in window)) {
+					alert("ブラウザがWebSocketsをサポートしていません");
+				}
 
-        document.querySelector("#connect").addEventListener("click", () => {
-          
-          socket.emit("join", "game");
-          socket.emit('user connected', devid); 
-          
-          setInterval(() => {
-            socket.emit("sensor", {
-              id: devid,
-              a: alpha,
-              b: beta, // 前後の傾き
-              g: gamma, // 左右の傾き
-              z: z, 
-            });
-            
-            // [デバッグ表示の更新]
-            document.querySelector("#beta_tilt").textContent = beta;
-            document.querySelector("#gamma_tilt").textContent = gamma;
-            document.querySelector("#z_accel").textContent = z;
-            
-          }, interval);
-          
-          document.querySelector("#connect").style.display = "none";
-          request_permission();
-        });
+				document.querySelector("#connect").addEventListener("click", () => {
+					
+					socket.emit("join", "game");
+					socket.emit('user connected', devid); 
+					
+					setInterval(() => {
+						socket.emit("sensor", {
+							id: devid,
+							a: alpha,
+							b: beta,
+							g: gamma,
+							z: z, 
+						});
+						
+						
+						document.querySelector("#beta_tilt").textContent = beta;
+						document.querySelector("#gamma_tilt").textContent = gamma;
+						document.querySelector("#z_accel").textContent = z;
+						
+					}, interval);
+					
+					document.querySelector("#connect").style.display = "none";
+					request_permission();
+				});
 
-        function getColorFromId(id) {
-          let hash = 0;
-          for (let i = 0; i < id.length; i++) {
-            hash = id.charCodeAt(i) + ((hash << 5) - hash);
-          }
-          const h = Math.abs(hash % 360);
-          return `hsl(${h}, 60%, 65%)`;
-        }
+				function getColorFromId(id) {
+					let hash = 0;
+					for (let i = 0; i < id.length; i++) {
+						hash = id.charCodeAt(i) + ((hash << 5) - hash);
+					}
+					const h = Math.abs(hash % 360);
+					return `hsl(${h}, 60%, 65%)`;
+				}
 
-        // Z軸加速度（縦方向の揺れ）を取得
-        window.ondevicemotion = (event) => {
-          if (event.accelerationIncludingGravity && event.accelerationIncludingGravity.z !== null) {
-            z = event.accelerationIncludingGravity.z.toFixed(decPlaces);
-          }
-        };
+				
+				window.ondevicemotion = (event) => {
+					if (event.accelerationIncludingGravity && event.accelerationIncludingGravity.z !== null) {
+						z = event.accelerationIncludingGravity.z.toFixed(decPlaces);
+					}
+				};
 
-        // 傾き（Device Orientation）を取得
-        window.ondeviceorientation = (event) => {
-          alpha = event.alpha.toFixed(decPlaces);
-          beta = event.beta.toFixed(decPlaces);
-          gamma = event.gamma.toFixed(decPlaces); 
-        };
+				
+				window.ondeviceorientation = (event) => {
+					alpha = event.alpha.toFixed(decPlaces);
+					beta = event.beta.toFixed(decPlaces);
+					gamma = event.gamma.toFixed(decPlaces); 
+				};
 
-        function request_permission() {
-          if (
-            DeviceMotionEvent &&
-            typeof DeviceMotionEvent.requestPermission === "function"
-          ) {
-            DeviceMotionEvent.requestPermission();
-          }
-          if (
-            DeviceOrientationEvent &&
-            typeof DeviceOrientationEvent.requestPermission === "function"
-          ) {
-            DeviceOrientationEvent.requestPermission();
-          }
-        }
-      });
-    </script>
+				function request_permission() {
+					if (
+						DeviceMotionEvent &&
+						typeof DeviceMotionEvent.requestPermission === "function"
+					) {
+						DeviceMotionEvent.requestPermission();
+					}
+					if (
+						DeviceOrientationEvent &&
+						typeof DeviceOrientationEvent.requestPermission === "function"
+					) {
+						DeviceOrientationEvent.requestPermission();
+					}
+				}
+			});
+		</script>
 
-    <style>
-      #connect {
-        width: 60%;
-        height: 40px;
-        font-size: 1.2em;
-        margin-top: 10px;
-      }
-      #content {
-        background-color: #ccc;
-        padding: 20px;
-        min-height: 200px;
-      }
-      .space {
-        height: 10px;
-      }
-    </style>
-  </head>
+		<style>
+			#connect {
+				width: 60%;
+				height: 40px;
+				font-size: 1.2em;
+				margin-top: 10px;
+			}
+			#content {
+				background-color: #ccc;
+				padding: 20px;
+				min-height: 200px;
+			}
+			.space {
+				height: 10px;
+			}
+		</style>
+	</head>
 
-  <body>
-    <center>
-      <div id="content">
-        <div class="space"></div>
-        <input id="connect" type="button" value="接続" />
-        <div>
-          <div class="space"></div>
-          <p id="contents">デバイスを傾けて下さい</p>
-          
-          <p>ベータ $\beta$（前後傾き）: <span id="beta_tilt">0</span></p>
-          <p>ガンマ $\gamma$（左右傾き）: <span id="gamma_tilt">0</span></p>
-          <p>Z軸加速度（未使用）: <span id="z_accel">0</span></p>
-        </div>
-      </div>
-      <div id="footer">
-        <h4>スマホセンサー</h4>
-      </div>
-    </center>
-  </body>
+	<body>
+		<center>
+			<div id="content">
+				<div class="space"></div>
+				<input id="connect" type="button" value="接続" />
+				<div>
+					<div class="space"></div>
+					<p id="contents">デバイスを傾けて下さい</p>
+					
+					<p>ベータ $\beta$（前後傾き）: <span id="beta_tilt">0</span></p>
+					<p>ガンマ $\gamma$（左右傾き）: <span id="gamma_tilt">0</span></p>
+					<p>Z軸加速度（未使用）: <span id="z_accel">0</span></p>
+				</div>
+			</div>
+			<div id="footer">
+				<h4>スマホセンサー</h4>
+			</div>
+		</center>
+	</body>
 </html>

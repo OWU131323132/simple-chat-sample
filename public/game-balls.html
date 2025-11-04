@@ -1,311 +1,310 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial=" initial-scale="1" />
-    <title>スマホで動く3Dボール</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.1.9/p5.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.3/socket.io.js"></script>
-    <style>
-        body { margin: 0; background-color: black; }
-        #info {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: white;
-            font-family: sans-serif;
-            z-index: 1000;
-        }
-        /* ★追加：注意書きのスタイル★ */
-        #start-instruction {
-            color: #FFD700; /* 金色 */
-            font-size: 16px;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-        #overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            z-index: 1000;
-            background-color: rgba(0, 0, 0, 0.5); 
-            pointer-events: none; 
-        }
-        #clear-message {
-            color: #4CAF50; 
-            font-size: 72px;
-            font-weight: bold;
-            text-shadow: 4px 4px 8px black;
-            margin-bottom: 20px;
-            display: none;
-        }
-        #final-time {
-            color: white;
-            font-size: 48px;
-            font-weight: normal;
-            text-shadow: 2px 2px 4px black;
-            display: none;
-        }
-        #replay-button {
-            padding: 15px 30px;
-            font-size: 24px;
-            cursor: pointer;
-            background-color: #007BFF;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            margin-top: 30px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            display: none;
-            pointer-events: auto; 
-        }
-    </style>
-  </head>
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial=" initial-scale="1" />
+		<title>スマホで動く3Dボール</title>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.1.9/p5.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.3/socket.io.js"></script>
+		<style>
+			body { margin: 0; background-color: black; }
+			#info {
+				position: absolute;
+				top: 10px;
+				left: 10px;
+				color: white;
+				font-family: sans-serif;
+				z-index: 1000;
+			}
 
-  <body>
-    <div id="info">
-        <h1>スマホからのセンサ情報を受信</h1>
-        <div>あなたのID: <span id="myid"></span></div>
-        <button id="connect">ルームに入る</button>
-        <div id="start-instruction">
-            <p>【遊び方】スマホを傾けてボールを動かして、黄色のゴールまで、最速タイムを目指そう！</p>
-            <p>スタート前にスマホを地面と水平にしてください！</p>
-        </div>
-        <div>Time: <span id="game-time">0.00</span>s</div>
-    </div>
+			#start-instruction {
+				color: #FFD700;
+				font-size: 16px;
+				font-weight: bold;
+				margin-top: 10px;
+			}
+			#overlay {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				flex-direction: column;
+				z-index: 1000;
+				background-color: rgba(0, 0, 0, 0.5); 
+				pointer-events: none; 
+			}
+			#clear-message {
+				color: #4CAF50; 
+				font-size: 72px;
+				font-weight: bold;
+				text-shadow: 4px 4px 8px black;
+				margin-bottom: 20px;
+				display: none;
+			}
+			#final-time {
+				color: white;
+				font-size: 48px;
+				font-weight: normal;
+				text-shadow: 2px 2px 4px black;
+				display: none;
+			}
+			#replay-button {
+				padding: 15px 30px;
+				font-size: 24px;
+				cursor: pointer;
+				background-color: #007BFF;
+				color: white;
+				border: none;
+				border-radius: 8px;
+				margin-top: 30px;
+				box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+				display: none;
+				pointer-events: auto; 
+			}
+		</style>
+	</head>
 
-    <div id="overlay">
-        <div id="clear-message">🎉 CLEAR! 🎉</div>
-        <div id="final-time"></div>
-        <button id="replay-button">もう一度プレイ</button>
-    </div>
-    
-    <script>
-      let socket = io.connect();
+	<body>
+		<div id="info">
+			<h1>スマホからのセンサ情報を受信</h1>
+			<div>あなたのID: <span id="myid"></span></div>
+			<button id="connect">ルームに入る</button>
+			<div id="start-instruction">
+				<p>【遊び方】スマホを傾けてボールを動かして、黄色のゴールまで、最速タイムを目指そう！</p>
+				<p>スタート前にスマホを地面と水平にしてください！</p>
+			</div>
+			<div>Time: <span id="game-time">0.00</span>s</div>
+		</div>
 
-      let btn = document.querySelector("#connect");
-      let replayBtn = document.querySelector("#replay-button");
-      let instructionDiv = document.querySelector("#start-instruction"); // 注意書き要素
+		<div id="overlay">
+			<div id="clear-message">🎉 CLEAR! 🎉</div>
+			<div id="final-time"></div>
+			<button id="replay-button">もう一度プレイ</button>
+		</div>
 
-      let b = 0; 
-      let g = 0; 
-      let operatedById = null; 
-      
-      let startTime = 0;
-      let elapsedTime = 0;
-      let gameRunning = false; 
-      let isCleared = false;
-      let clearMessage = document.querySelector("#clear-message");
-      let timeDisplay = document.querySelector("#game-time");
-      let finalTimeDisplay = document.querySelector("#final-time");
+		<script>
+			let socket = io.connect();
 
-      let myid = sessionStorage.getItem('clientId');
-      if (!myid) {
-        myid = Math.random().toString(36).substring(2, 15);
-        sessionStorage.setItem('clientId', myid);
-      }
-      
-      document.querySelector("#myid").innerHTML = myid;
+			let btn = document.querySelector("#connect");
+			let replayBtn = document.querySelector("#replay-button");
+			let instructionDiv = document.querySelector("#start-instruction");
 
-      function startGame() {
-          startTime = millis();
-          gameRunning = true;
-          isCleared = false;
-          
-          // UIをリセット
-          clearMessage.style.display = 'none';
-          finalTimeDisplay.style.display = 'none';
-          replayBtn.style.display = 'none';
-          instructionDiv.style.display = 'none'; // ★ゲーム開始時に非表示にする★
-          document.querySelector("#overlay").style.pointerEvents = 'none';
+			let b = 0; 
+			let g = 0; 
+			let operatedById = null; 
+	
+			let startTime = 0;
+			let elapsedTime = 0;
+			let gameRunning = false; 
+			let isCleared = false;
+			let clearMessage = document.querySelector("#clear-message");
+			let timeDisplay = document.querySelector("#game-time");
+			let finalTimeDisplay = document.querySelector("#final-time");
 
-          // ボールを初期位置に戻す
-          x = INITIAL_X;
-          y = INITIAL_Y;
-          z_offset = 0;
-          isFalling = false;
-      }
-      
-      btn.addEventListener("click", function () {
-        socket.emit("user connected", myid); 
-        socket.emit("join", "game");
-        btn.remove();
-        startGame();
-      });
-      
-      replayBtn.addEventListener("click", function() {
-          startGame();
-      });
-    
-      // スマホからのセンサーデータ受信とIDチェック
-      socket.on("sensor", function (data) {
-        if (!operatedById) {
-            operatedById = data.id;
-        }
-        if (data.id === operatedById) {
-            g = parseFloat(data.g);
-            b = parseFloat(data.b);
-        }
-      });
+			let myid = sessionStorage.getItem('clientId');
+			if (!myid) {
+				myid = Math.random().toString(36).substring(2, 15);
+				sessionStorage.setItem('clientId', myid);
+			}
 
-      let x = 0;
-      let y = 0;
-      let z_offset = 0; 
-      let isFalling = false; 
+			document.querySelector("#myid").innerHTML = myid;
 
-      let r = 40; 
-      let speed = 0.1; 
-      
-      const VIRTUAL_BOARD_WIDTH = 600; 
-      const VIRTUAL_BOARD_HEIGHT = 1600; 
-      
-      const segmentWidth = 100; 
-      const segmentHeight = 150; 
-      const shiftX = 150; 
-      const START_SEGMENT_WIDTH = 300; 
-      
-      const courseSegments = [
-          { x: 0, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight/2, w: START_SEGMENT_WIDTH, h: segmentHeight }, 
-          { x: shiftX, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 1.5, w: segmentWidth + shiftX, h: segmentHeight }, 
-          { x: 0, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 2.5, w: segmentWidth + shiftX, h: segmentHeight }, 
-          { x: -shiftX, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 3.5, w: segmentWidth + shiftX, h: segmentHeight }, 
-          { x: 0, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 4.5, w: segmentWidth + shiftX, h: segmentHeight }, 
-          { x: shiftX, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 5.5, w: segmentWidth + shiftX, h: segmentHeight }, 
-          { x: 0, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 6.5, w: segmentWidth + shiftX, h: segmentHeight }, 
-          { x: -shiftX, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 7.5, w: segmentWidth + shiftX, h: segmentHeight }, 
-      ];
-      
-      const GOAL_SEGMENT_INDEX = courseSegments.length - 1;
+			function startGame() {
+				startTime = millis();
+				gameRunning = true;
+				isCleared = false;
+				
+				
+				clearMessage.style.display = 'none';
+				finalTimeDisplay.style.display = 'none';
+				replayBtn.style.display = 'none'; 
+				instructionDiv.style.display = 'none'; 
+				document.querySelector("#overlay").style.pointerEvents = 'none';
 
-      const INITIAL_X = courseSegments[0].x;
-      const INITIAL_Y = courseSegments[0].y;
-      
-      // ----------------------------
+				
+				x = INITIAL_X;
+				y = INITIAL_Y;
+				z_offset = 0;
+				isFalling = false;
+			}
+	
+			btn.addEventListener("click", function () {
+				socket.emit("user connected", myid); 
+				socket.emit("join", "game");
+				btn.remove();
+				startGame();
+			});
+	
+			replayBtn.addEventListener("click", function() {
+				startGame();
+			});
 
-      function getOnSegmentIndex(ballX, ballY) {
-          for (let i = 0; i < courseSegments.length; i++) {
-              let segment = courseSegments[i];
-              const halfW = segment.w / 2;
-              const halfH = segment.h / 2;
-              
-              const segMinX = segment.x - halfW;
-              const segMaxX = segment.x + halfW;
-              const segMinY = segment.y - halfH;
-              const segMaxY = segment.y + halfH;
-              
-              if (ballX >= segMinX && ballX <= segMaxX &&
-                  ballY >= segMinY && ballY <= segMaxY) {
-                  return i; 
-              }
-          }
-          return -1; 
-      }
+			socket.on("sensor", function (data) {
+				if (!operatedById) {
+					operatedById = data.id;
+				}
+				if (data.id === operatedById) {
+					g = parseFloat(data.g);
+					b = parseFloat(data.b);
+				}
+			});
 
-      function setup() {
-        createCanvas(800, 800, WEBGL); 
-        camera(0, 800, 100, 0, 0, 0, 0, 1, 0); 
-        noStroke();
-        x = INITIAL_X;
-        y = INITIAL_Y;
-      }
+			let x = 0;
+			let y = 0;
+			let z_offset = 0; 
+			let isFalling = false; 
 
-      function draw() {
-        background(0);
-        
-        // ★修正：環境光と指向性ライトを明るくする★
-        ambientLight(150, 150, 150); // 全体を明るく
-        directionalLight(255, 255, 255, -1, -1, -1); // 影が強すぎないように
-        pointLight(20, 20, 100, 0, 0, 800);
+			let r = 40; 
+			let speed = 0.1; 
+	
+			const VIRTUAL_BOARD_WIDTH = 600; 
+			const VIRTUAL_BOARD_HEIGHT = 1600; 
+	
+			const segmentWidth = 100; 
+			const segmentHeight = 150; 
+			const shiftX = 150; 
+			const START_SEGMENT_WIDTH = 300; 
+	
+			const courseSegments = [
+				{ x: 0, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight/2, w: START_SEGMENT_WIDTH, h: segmentHeight }, 
+				{ x: shiftX, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 1.5, w: segmentWidth + shiftX, h: segmentHeight }, 
+				{ x: 0, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 2.5, w: segmentWidth + shiftX, h: segmentHeight }, 
+				{ x: -shiftX, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 3.5, w: segmentWidth + shiftX, h: segmentHeight }, 
+				{ x: 0, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 4.5, w: segmentWidth + shiftX, h: segmentHeight }, 
+				{ x: shiftX, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 5.5, w: segmentWidth + shiftX, h: segmentHeight }, 
+				{ x: 0, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 6.5, w: segmentWidth + shiftX, h: segmentHeight }, 
+				{ x: -shiftX, y: -(VIRTUAL_BOARD_HEIGHT/2) + segmentHeight * 7.5, w: segmentWidth + shiftX, h: segmentHeight }, 
+			];
+	
+			const GOAL_SEGMENT_INDEX = courseSegments.length - 1;
 
-        
-        if (gameRunning && !isCleared) {
-            elapsedTime = (millis() - startTime) / 1000;
-            timeDisplay.innerHTML = elapsedTime.toFixed(2);
-        }
+			const INITIAL_X = courseSegments[0].x;
+			const INITIAL_Y = courseSegments[0].y;
+	
+	
+			function getOnSegmentIndex(ballX, ballY) {
+				for (let i = 0; i < courseSegments.length; i++) {
+					let segment = courseSegments[i];
+					const halfW = segment.w / 2;
+					const halfH = segment.h / 2;
+		
+					const segMinX = segment.x - halfW;
+					const segMaxX = segment.x + halfW;
+					const segMinY = segment.y - halfH;
+					const segMaxY = segment.y + halfH;
+		
+					if (ballX >= segMinX && ballX <= segMaxX &&
+						ballY >= segMinY && ballY <= segMaxY) {
+						return i; 
+					}
+				}
+				return -1; 
+			}
 
-        let current_g = (gameRunning && !isCleared) ? g : 0;
-        let current_b = (gameRunning && !isCleared) ? b : 0;
+			function setup() {
+				createCanvas(800, 800, WEBGL); 
+				camera(0, 800, 100, 0, 0, 0, 0, 1, 0); 
+				noStroke();
+				x = INITIAL_X;
+				y = INITIAL_Y;
+			}
 
-        // 板全体を傾ける (回転)
-        push();
-        rotateX((-PI * current_b) / 180);
-        rotateY((PI * current_g) / 180);
-        translate(0, 0, -50); 
+			function draw() {
+				background(0);
+		
+				
+				ambientLight(150, 150, 150); 
+				directionalLight(255, 255, 255, -1, -1, -1); 
+				pointLight(20, 20, 100, 0, 0, 800);
 
-        // コースの描画
-        for (let i = 0; i < courseSegments.length; i++) {
-            const segment = courseSegments[i];
-            push();
-            translate(segment.x, segment.y, 0);
+		
+				
+				if (gameRunning && !isCleared) {
+					elapsedTime = (millis() - startTime) / 1000;
+					timeDisplay.innerHTML = elapsedTime.toFixed(2);
+				}
 
-            // ★ゴールセグメントの色の変更（黄色）★
-            if (i === GOAL_SEGMENT_INDEX) {
-                specularMaterial(255, 200, 0); // 黄色/ゴールド
-            } else {
-                specularMaterial(50, 50, 150); // 他の足場は青系で統一
-            }
-            
-            box(segment.w, segment.h, 30); 
-            pop();
-        }
-        pop(); // 板全体の回転をリセット
+				let current_g = (gameRunning && !isCleared) ? g : 0;
+				let current_b = (gameRunning && !isCleared) ? b : 0;
 
-        // ボールの動き
-        push();
-        
-        if (gameRunning && !isCleared) {
-            let onSegmentIndex = getOnSegmentIndex(x, y);
+				
+				push();
+				rotateX((-PI * current_b) / 180);
+				rotateY((PI * current_g) / 180);
+				translate(0, 0, -50); 
 
-            if (!isFalling) {
-                // 1. 通常時の位置更新
-                x = x + speed * current_g;
-                y = y + speed * current_b;
+				
+				for (let i = 0; i < courseSegments.length; i++) {
+					const segment = courseSegments[i];
+					push();
+					translate(segment.x, segment.y, 0);
 
-                // 2. ゴール判定
-                if (onSegmentIndex === GOAL_SEGMENT_INDEX) {
-                    isCleared = true;
-                    // クリア時の表示更新
-                    finalTimeDisplay.innerHTML = `Time: ${elapsedTime.toFixed(2)}s`;
-                    clearMessage.style.display = 'block';
-                    finalTimeDisplay.style.display = 'block';
-                    replayBtn.style.display = 'block';
-                    document.querySelector("#overlay").style.pointerEvents = 'auto'; 
-                }
+					
+					if (i === GOAL_SEGMENT_INDEX) {
+						specularMaterial(255, 200, 0); 
+					} else {
+						specularMaterial(50, 50, 150); 
+					}
+		
+					box(segment.w, segment.h, 30); 
+					pop();
+				}
+				pop(); 
 
-                // 3. 穴落ち判定
-                if (onSegmentIndex === -1) {
-                    isFalling = true;
-                }
+				
+				push();
+		
+				if (gameRunning && !isCleared) {
+					let onSegmentIndex = getOnSegmentIndex(x, y);
 
-            } else {
-                // 4. 落下アニメーション中
-                z_offset -= 10; 
-                if (z_offset < -200) { 
-                    x = INITIAL_X;
-                    y = INITIAL_Y;
-                    z_offset = 0;
-                    isFalling = false;
-                }
-            }
-        }
-        
-        // ボールの高さを計算（傾きを考慮）
-        let tiltZ = -x * sin((PI * current_g) / 180) - y * sin((PI * current_b) / 180);
+					if (!isFalling) {
+						
+						x = x + speed * current_g;
+						y = y + speed * current_b;
 
-        translate(x, y, tiltZ + z_offset);
-        
-        specularMaterial(200);
-        sphere(r);
-        
-        pop();
-      }
-    </script>
-  </body>
+						
+						if (onSegmentIndex === GOAL_SEGMENT_INDEX) {
+							isCleared = true;
+							
+							finalTimeDisplay.innerHTML = `Time: ${elapsedTime.toFixed(2)}s`;
+							clearMessage.style.display = 'block';
+							finalTimeDisplay.style.display = 'block';
+							replayBtn.style.display = 'block';
+							document.querySelector("#overlay").style.pointerEvents = 'auto'; 
+						}
+
+						
+						if (onSegmentIndex === -1) {
+							isFalling = true;
+						}
+
+					} else {
+						
+						z_offset -= 10; 
+						if (z_offset < -200) { 
+							x = INITIAL_X;
+							y = INITIAL_Y;
+							z_offset = 0;
+							isFalling = false;
+						}
+					}
+				}
+		
+				
+				let tiltZ = -x * sin((PI * current_g) / 180) - y * sin((PI * current_b) / 180);
+
+				translate(x, y, tiltZ + z_offset);
+		
+				specularMaterial(200);
+				sphere(r);
+		
+				pop();
+			}
+		</script>
+	</body>
 </html>
